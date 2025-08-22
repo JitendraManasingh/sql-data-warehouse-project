@@ -1,202 +1,129 @@
 /*****************************************************************************************
-   Script Name : bronze.load_bronze
-   Purpose     : Load raw CSV data from CRM & ERP sources into Bronze schema (staging layer).
+   DDL Script Name : Create Bronze Tables
+   Script Purpose  : This script creates tables in the 'bronze' schema, dropping existing tables if they already exist. Run this script to re-define the DDL structure of 'bronze' tables.
+
    Author      : Jitendra Kumar Manasingh
    Created On  : 23/08/2025
 
    Description :
-       - Truncate Bronze tables (clear old data).
-       - Bulk insert fresh CSV data from source files.
-       - Print progress messages and log duration for each step.
-       - Provide basic error handling for debugging.
+       - Drops and recreates Bronze layer tables to ensure a clean staging area.
+       - Stores raw data imported from CRM and ERP systems before transformation
+         into Silver and Gold layers.
 
    WARNING :
-       - TRUNCATE TABLE removes ALL existing data.
-       - BULK INSERT requires that the file paths exist and SQL Server has access.
-       - Ensure proper permissions on the data folder.
+       - Running this script will DROP existing tables in the Bronze schema.
+       - All previously loaded data in these tables will be LOST.
+       - Intended for ETL staging; do not store permanent records here.
+
 *****************************************************************************************/
+
+-- Switch to DataWarehouse database
+USE DataWarehouse;
+GO
 
 
 /*****************************************************************************************
-   Execute the Procedure
-   ---------------------------------------------------------------------
-   Example:
-       EXEC bronze.load_bronze;
+   CRM Source Tables (Bronze Layer)
 *****************************************************************************************/
 
+-- ================================
+-- CRM Customer Information (Raw)
+-- ================================
+IF OBJECT_ID('bronze.crm_cust_info','U') IS NOT NULL
+    DROP TABLE bronze.crm_cust_info;
 
-CREATE OR ALTER PROCEDURE bronze.load_bronze AS
-BEGIN
-    -- Declare variables to track timings
-    DECLARE @start_time DATETIME, @end_time DATETIME;
-    DECLARE @batch_start_time DATETIME, @batch_end_time DATETIME;
-
-    BEGIN TRY
-        -- Start overall batch timer
-        SET @batch_start_time = GETDATE();
-
-        PRINT '=========================================================';
-        PRINT '🚀 Starting Bronze Layer Load';
-        PRINT '=========================================================';
-
-        /*****************************************************************************************
-           Load CRM Tables
-        *****************************************************************************************/
-        PRINT '---------------------------------------------------------';    
-        PRINT '📂 Loading CRM Tables';
-        PRINT '---------------------------------------------------------';
-
-        -----------------------------------------
-        -- CRM Customer Information
-        -----------------------------------------
-        SET @start_time = GETDATE();
-        PRINT '>> Truncating Table: bronze.crm_cust_info';
-        TRUNCATE TABLE bronze.crm_cust_info;
-
-        PRINT '>> Inserting Data Into: bronze.crm_cust_info';
-        BULK INSERT bronze.crm_cust_info
-        FROM 'D:\SQL - MySQL Projects\The Complete SQL Bootcamp (30 Hours) Go from Zero to Hero - Baraa Khatib Salkini\SQL - Data Warehouse Projects\sql-data-warehouse-project\datasets\source_crm\cust_info.csv'
-        WITH (
-            FIRSTROW = 2,              -- Skip header row
-            FIELDTERMINATOR = ',',     -- CSV delimiter
-            ROWTERMINATOR = '\n',      -- Line break
-            TABLOCK                    -- Table lock for faster load
-        );
-
-        SET @end_time = GETDATE();
-        PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + ' Seconds';
+CREATE TABLE bronze.crm_cust_info (
+    cst_id              INT,             -- Customer ID (numeric surrogate)
+    cst_key             NVARCHAR(50),    -- Customer business key from CRM
+    cst_firstname       NVARCHAR(50),    -- Customer first name
+    cst_lastname        NVARCHAR(50),    -- Customer last name
+    cst_marital_status  NVARCHAR(50),    -- Marital status
+    cst_gndr            NVARCHAR(50),    -- Gender
+    cst_create_date     DATE             -- Customer creation date in CRM
+);
+GO
 
 
-        -----------------------------------------
-        -- CRM Product Information
-        -----------------------------------------
-        SET @start_time = GETDATE();
-        PRINT '>> Truncating Table: bronze.crm_prd_info';
-        TRUNCATE TABLE bronze.crm_prd_info;
+-- ================================
+-- CRM Product Information (Raw)
+-- ================================
+IF OBJECT_ID('bronze.crm_prd_info','U') IS NOT NULL
+    DROP TABLE bronze.crm_prd_info;
 
-        PRINT '>> Inserting Data Into: bronze.crm_prd_info';
-        BULK INSERT bronze.crm_prd_info
-        FROM 'D:\SQL - MySQL Projects\The Complete SQL Bootcamp (30 Hours) Go from Zero to Hero - Baraa Khatib Salkini\SQL - Data Warehouse Projects\sql-data-warehouse-project\datasets\source_crm\prd_info.csv'
-        WITH (
-            FIRSTROW = 2,
-            FIELDTERMINATOR = ',',
-            ROWTERMINATOR = '\n',
-            TABLOCK
-        );
-
-        SET @end_time = GETDATE();
-        PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + ' Seconds';
+CREATE TABLE bronze.crm_prd_info (
+    prd_id          INT,             -- Product ID (numeric surrogate)
+    prd_key         NVARCHAR(50),    -- Product business key from CRM
+    prd_nm          NVARCHAR(50),    -- Product name
+    prd_cost        INT,             -- Product cost
+    prd_line        NVARCHAR(50),    -- Product line/category
+    prd_start_dt    DATETIME,        -- Product start date (valid from)
+    prd_end_dt      DATETIME         -- Product end date (valid to)
+);
+GO
 
 
-        -----------------------------------------
-        -- CRM Sales Details
-        -----------------------------------------
-        SET @start_time = GETDATE();
-        PRINT '>> Truncating Table: bronze.crm_sales_details';
-        TRUNCATE TABLE bronze.crm_sales_details;
+-- ================================
+-- CRM Sales Details (Raw)
+-- ================================
+IF OBJECT_ID('bronze.crm_sales_details','U') IS NOT NULL
+    DROP TABLE bronze.crm_sales_details;
 
-        PRINT '>> Inserting Data Into: bronze.crm_sales_details';
-        BULK INSERT bronze.crm_sales_details
-        FROM 'D:\SQL - MySQL Projects\The Complete SQL Bootcamp (30 Hours) Go from Zero to Hero - Baraa Khatib Salkini\SQL - Data Warehouse Projects\sql-data-warehouse-project\datasets\source_crm\sales_details.csv'
-        WITH (
-            FIRSTROW = 2,
-            FIELDTERMINATOR = ',',
-            ROWTERMINATOR = '\n',
-            TABLOCK
-        );
-
-        SET @end_time = GETDATE();
-        PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + ' Seconds';
-
-
-        /*****************************************************************************************
-           Load ERP Tables
-        *****************************************************************************************/
-        PRINT '---------------------------------------------------------';    
-        PRINT '📂 Loading ERP Tables';
-        PRINT '---------------------------------------------------------';
-
-        -----------------------------------------
-        -- ERP Customer Information
-        -----------------------------------------
-        SET @start_time = GETDATE();
-        PRINT '>> Truncating Table: bronze.erp_cust_az12';
-        TRUNCATE TABLE bronze.erp_cust_az12;
-
-        PRINT '>> Inserting Data Into: bronze.erp_cust_az12';
-        BULK INSERT bronze.erp_cust_az12
-        FROM 'D:\SQL - MySQL Projects\The Complete SQL Bootcamp (30 Hours) Go from Zero to Hero - Baraa Khatib Salkini\SQL - Data Warehouse Projects\sql-data-warehouse-project\datasets\source_erp\CUST_AZ12.csv'
-        WITH (
-            FIRSTROW = 2,
-            FIELDTERMINATOR = ',',
-            ROWTERMINATOR = '\n',
-            TABLOCK
-        );
-
-        SET @end_time = GETDATE();
-        PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + ' Seconds';
+CREATE TABLE bronze.crm_sales_details (
+    sls_ord_num     NVARCHAR(50),    -- Sales order number
+    sls_prd_key     NVARCHAR(50),    -- Product key (foreign key to product)
+    sls_cust_id     INT,             -- Customer ID (foreign key to customer)
+    sls_order_dt    INT,             -- Order date (consider changing to DATE)
+    sls_ship_dt     INT,             -- Shipment date (consider changing to DATE)
+    sls_due_dt      INT,             -- Due date (consider changing to DATE)
+    sls_sales       INT,             -- Total sales amount
+    sls_quantity    INT,             -- Quantity sold
+    sls_price       INT              -- Price per unit
+);
+GO
 
 
-        -----------------------------------------
-        -- ERP Location Information
-        -----------------------------------------
-        SET @start_time = GETDATE();
-        PRINT '>> Truncating Table: bronze.erp_loc_a101';
-        TRUNCATE TABLE bronze.erp_loc_a101;
 
-        PRINT '>> Inserting Data Into: bronze.erp_loc_a101';
-        BULK INSERT bronze.erp_loc_a101
-        FROM 'D:\SQL - MySQL Projects\The Complete SQL Bootcamp (30 Hours) Go from Zero to Hero - Baraa Khatib Salkini\SQL - Data Warehouse Projects\sql-data-warehouse-project\datasets\source_erp\LOC_A101.csv'
-        WITH (
-            FIRSTROW = 2,
-            FIELDTERMINATOR = ',',
-            ROWTERMINATOR = '\n',
-            TABLOCK
-        );
+/*****************************************************************************************
+   ERP Source Tables (Bronze Layer)
+*****************************************************************************************/
 
-        SET @end_time = GETDATE();
-        PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + ' Seconds';
+-- ================================
+-- ERP Location Information (Raw)
+-- ================================
+IF OBJECT_ID('bronze.erp_loc_a101','U') IS NOT NULL
+    DROP TABLE bronze.erp_loc_a101;
+
+CREATE TABLE bronze.erp_loc_a101 (
+    cid     NVARCHAR(50),    -- Customer/location ID
+    CNTRY   NVARCHAR(50)     -- Country name
+);
+GO
 
 
-        -----------------------------------------
-        -- ERP Product Category Information
-        -----------------------------------------
-        SET @start_time = GETDATE();
-        PRINT '>> Truncating Table: bronze.erp_px_cat_g1V2';
-        TRUNCATE TABLE bronze.erp_px_cat_g1V2;
+-- ================================
+-- ERP Customer Information (Raw)
+-- ================================
+IF OBJECT_ID('bronze.erp_cust_az12','U') IS NOT NULL
+    DROP TABLE bronze.erp_cust_az12;
 
-        PRINT '>> Inserting Data Into: bronze.erp_px_cat_g1V2';
-        BULK INSERT bronze.erp_px_cat_g1V2
-        FROM 'D:\SQL - MySQL Projects\The Complete SQL Bootcamp (30 Hours) Go from Zero to Hero - Baraa Khatib Salkini\SQL - Data Warehouse Projects\sql-data-warehouse-project\datasets\source_erp\PX_CAT_G1V2.csv'
-        WITH (
-            FIRSTROW = 2,
-            FIELDTERMINATOR = ',',
-            ROWTERMINATOR = '\n',
-            TABLOCK
-        );
-
-        SET @end_time = GETDATE();
-        PRINT '>> Load Duration: ' + CAST(DATEDIFF(second, @start_time, @end_time) AS NVARCHAR) + ' Seconds';
+CREATE TABLE bronze.erp_cust_az12 (
+    cid     VARCHAR(50),     -- Customer ID
+    bdate   DATE,            -- Birth date
+    gen     NVARCHAR(50)     -- Gender
+);
+GO
 
 
-        /*****************************************************************************************
-           Final Summary
-        *****************************************************************************************/
-        SET @batch_end_time = GETDATE();
-        PRINT '=========================================================';
-        PRINT '✅ Bronze Layer Load Completed Successfully';
-        PRINT '   - Total Duration: ' + CAST(DATEDIFF(second, @batch_start_time, @batch_end_time) AS NVARCHAR) + ' Seconds';
-        PRINT '=========================================================';
+-- ================================
+-- ERP Product Category Information (Raw)
+-- ================================
+IF OBJECT_ID('bronze.erp_px_cat_g1V2','U') IS NOT NULL
+    DROP TABLE bronze.erp_px_cat_g1V2;
 
-    END TRY
-
-    BEGIN CATCH
-        PRINT '=========================================================';
-        PRINT '❌ ERROR OCCURRED DURING BRONZE LAYER LOAD';
-        PRINT 'Error Message: ' + ERROR_MESSAGE();
-        PRINT 'Error Number : ' + CAST(ERROR_NUMBER() AS NVARCHAR);
-        PRINT 'Error State  : ' + CAST(ERROR_STATE() AS NVARCHAR);
-        PRINT '=========================================================';
-    END CATCH
-END;
+CREATE TABLE bronze.erp_px_cat_g1V2 (
+    id           NVARCHAR(50),    -- Category ID
+    cat          NVARCHAR(50),    -- Main category
+    subcat       NVARCHAR(50),    -- Sub-category
+    maintenance  NVARCHAR(50)     -- Maintenance information/status
+);
 GO
